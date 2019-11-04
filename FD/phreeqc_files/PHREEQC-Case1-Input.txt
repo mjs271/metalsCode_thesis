@@ -1,0 +1,280 @@
+
+
+SOLUTION 0 Top boundary - shorewater infusion
+        -units  moles/kgw
+        pH     7.2
+        C(4)   3.535e-05
+        Ca     1.372e-04
+        Mg     8.641e-05
+        Feii   2.034e-19
+        Fe(3)  3.009e-09   #Ferrihydrite
+        K      1.279e-05
+        S      2.207e-28
+        Sulfate  5.830e-05
+        Na     1.000e-04  charge
+        Cl     1.946e-05
+        Oxy    4.249e-04
+        N(5)    8.e-5
+        Naq      9.15e-19
+         Pb     5.309e-08
+         Zn      8.717e-06
+        Acetate   7.e-3
+
+ END
+
+  # SOLUTION 1-45 Sediment column - shore water as initial condition
+  SOLUTION 1 Sediment column - shore water as initial condition
+        -units  moles/kgw
+        pH     7.2
+        C(4)   3.535e-05
+        Ca     1.372e-04
+        Mg     8.641e-05
+        Feii   2.034e-19
+        Fe(3)  3.009e-09   #Ferrihydrite
+        K      1.279e-05
+        S      2.207e-28
+        Sulfate  5.830e-05
+        Na     1.000e-04   charge
+        Cl     1.946e-05
+        Oxy    4.249e-04
+        N(5)    8.e-5
+        Naq      9.15e-19
+         Pb     5.309e-08
+         Zn      8.717e-06
+        Acetate   7.e-3
+
+    PHASES
+    Siderite
+	FeiiCO3 = Feii+2 + CO3-2
+	log_k	-10.576
+	delta_h	0	kJ
+
+SURFACE_SPECIES
+
+    Hfo_wOH + Feii+2 = Hfo_wOFeii+ + H+
+	log_k	-2.980
+	delta_h	0	kJ
+
+    Hfo_wOH + Feii+2 + H2O = Hfo_wOFeiiOH + 2H+
+	log_k	-11.550
+	delta_h	0	kJ
+
+   # EQUILIBRIUM_PHASES 1-45
+   EQUILIBRIUM_PHASES 1
+   Ferrihydrite  0.0    0.4595
+   FeS(ppt)      0.0    0.0
+
+   # SURFACE 1-45
+   SURFACE 1
+       # -equilibrate solution 1-45
+       -equilibrate solution 1
+       Hfo_wOH        Ferrihydrite  EQUILIBRIUM_PHASE  0.39    21908
+
+
+USE solution none
+
+# SAVE solution 1-45
+SAVE solution 1
+
+END
+
+
+
+ RATES    #Rate expressions for kinetic reactions
+#
+       O2_kin
+       -start
+10 Ks = 2.41e-5
+20 Vmm = 5.e-9
+22 logQ = LA("Acetate-") + 2.*LA("Oxy") -2.*LA("CO3-2") -3.*LA("H+")
+24 logK = -126.100
+26 LQK = logQ-logK
+#################
+# Use symetric (1-Q/K) rate law for consistency with toughreact
+28 QK=10.^LQK
+#if QK>1  reaction is from right to left (normal case, removes acetate), we want fact positive because Vm is negative
+30 if(QK>1.01) then fact =  (1-1/QK)
+#if QK<1  reaction is from left to right, we want fact negative to reverse direction
+32 if(QK<0.99) then fact =  -(1-QK)
+# if QK between 0.99 and 1.01, assume equilibrium
+34 if(QK<=1.01 AND QK>=0.99 ) then fact=0.
+################
+36 f1 = MOL("Oxy")/(Ks + MOL("Oxy"))
+40 moles = -Vmm * f1 * TIME * fact
+42 new_mol = MOL("Oxy") + 2.* moles
+45 if(new_mol < 0. ) then moles = (-MOL("Oxy") + 1.e-30) /2.
+50 PUT(lqk, 1)
+60 SAVE moles
+        -end
+
+        NO3_kin
+       -start
+10 Ks = 1.13e-4 #Doussan
+20 Vmm = 2.e-10 # 1.e-10
+30 KO2in = 1.61e-8  #Doussan
+32 logQ = LA("Acetate-") + 1.6*LA("NO3-") -2.*LA("CO3-2") -0.8*LA("Naq") -1.4*LA("H+") -0.8*LA("H2O")
+34 logK = -153.6
+36 LQK = logQ-logK
+#################
+# Note for current inputs equilibrium is never reached for NO3
+# Use symetric (1-Q/K) rate law for consistency with toughreact
+38 QK=10.^LQK
+#if QK>1  reaction is from right to left (normal case, removes acetate), we want fact positive because Vm is negative
+40 if(QK>1.01) then fact =  (1-1/QK)
+#if QK<1  reaction is from left to right, we want fact negative to reverse direction
+42 if(QK<0.99) then fact =  -(1-QK)
+# if QK between 0.99 and 1.01, assume equilibrium
+44 if(QK<=1.01 AND QK>=0.99 ) then fact=0.
+################
+46 f1 = MOL("NO3-")/(Ks + MOL("NO3-")) * KO2in/(KO2in + MOL("Oxy"))
+50 moles = -Vmm * f1 * TIME * fact
+60 PUT(lqk, 3)
+70 SAVE moles
+        -end
+#
+       Fe_kin
+       -start
+#Note, we are not really using the Bonneville kinetics because
+#  Fe(III) concentration stays around 1.e-9.
+10  Vmm = 15e-12  #assume constant rate, infinite ferrihydrite source
+22 KO2in = 1.61e-8
+24 KNO3in = 1.e-7
+32 logQ = LA("Acetate-") + 8.*LA("Fe+3") + 4.*LA("H2O") -2.*LA("CO3-2") -8.*LA("Feii+2") -11.*LA("H+")
+34 logK = -58.340
+36 LQK = logQ-logK
+#################
+# Note for current inputs equilibrium is never reached for Fe
+# Use symetric (1-Q/K) rate law for consistency with toughreact
+38 QK=10.^LQK
+#if QK>1  reaction is from right to left (normal case, removes acetate), we want fact positive because Vm is negative
+40 if(QK>1.01) then fact =  (1-1/QK)
+#if QK<1  reaction is from left to right, we want fact negative to reverse direction
+42 if(QK<0.99) then fact =  -(1-QK)
+# if QK between 0.99 and 1.01, assume equilibrium
+44 if(QK<=1.01 AND QK>=0.99 ) then fact=0.
+################
+46 f1 =  KO2in/(KO2in + MOL("Oxy"))* KNO3in/(KNO3in + MOL("NO3-"))
+50 moles = -Vmm * f1 * TIME * fact
+60 PUT(lqk, 2)
+70 SAVE moles
+        -end
+#
+        SO4_kin
+       -start
+10 Ks = 1.e-3
+20 Vmm = 3.e-9
+22 KO2in = 1.61e-8
+24 KNO3in = 1.e-7
+26 KFein =  1.e-8
+32 logQ = LA("Acetate-") + 1.*LA("Sulfate-2") -2.*LA("CO3-2") -1.*LA("HS-") -2.*LA("H+")
+34 logK = 12.26
+35 LQK = logQ-logK
+#################
+# Note for current inputs equilibrium is never reached for SO4
+# Use symetric (1-Q/K) rate law for consistency with toughreact
+36 QK=10.^LQK
+#if QK>1  reaction is from right to left (normal case, removes acetate), we want fact positive because Vm is negative
+38 if(QK>1.01) then fact =  (1-1/QK)
+#if QK<1  reaction is from left to right, we want fact negative to reverse direction
+40 if(QK<0.99) then fact =  -(1-QK)
+# if QK between 0.99 and 1.01, assume equilibrium
+42 if(QK<=1.01 AND QK>=0.99 ) then fact=0.
+#################
+46 f1 = MOL("Sulfate-2")/(Ks + MOL("Sulfate-2")) * KO2in/(KO2in + MOL("Oxy"))* KNO3in/(KNO3in + MOL("NO3-"))* KFein/(KFein + MOL("Fe+3"))
+50 moles = -Vmm * f1 * TIME * fact
+60 PUT(lqk, 4)
+65 put(moles,10)
+70 SAVE moles
+        -end
+
+   Siderite_kin
+   -start
+9  ka = 3.38e-14
+17 logQK= SI("Siderite")
+18 QK = 10.^logQK
+19 aff = 1.0-QK
+22 fact = ka * aff
+30 moles = fact * TIME
+40 PUT(fact, 5)
+41 PUT(a, 6)
+43 PUT(Q, 7)
+50 SAVE moles
+        -end
+
+# KINETICS 1-45 Four kinetic reactions for all cells
+KINETICS 1 Four kinetic reactions for all cells
+
+         O2_kin         #put 1
+              -formula Acetate- 1.0 Oxy 2.0 CO3-2 -2.0 H+ -3.0
+              -m  0.0
+              -tol 1.e-9
+
+
+         Fe_kin         #put 2
+              -formula Acetate- 1.0 Fe+3 8.0 H2O 4.0 Feii+2 -8.0 CO3-2 -2.0 H+ -11.0
+              -m  0.0
+              -tol 1.e-9
+
+
+         NO3_kin        #put 3
+              -formula Acetate- 1.0 NO3- 1.6 CO3-2 -2.0 Naq -0.8  H+ -1.4  H2O -0.8
+              -m  0.0
+              -tol 1.e-9
+
+
+         SO4_kin        #put 4
+              -formula Acetate- 1.0  Sulfate-2 1.0  CO3-2 -2.0  HS- -1.0 H+ -2.0
+              -m  0.0
+              -tol 1.e-9
+
+
+         Siderite_kin   #put 5
+               -formula Feii+2 1.0  CO3-2 1.0  #Siderite -1.0
+               -m0  3.838449
+               -tol 1.e-9
+
+SELECTED_OUTPUT
+        # -file plot-modified.dat
+        -kinetic_reactants
+        -totals Oxy N(5) Naq Feii Fe(3) Sulfate S Acetate
+USER_PUNCH
+        -heading    O2_H2O NIV_N2 FeII_FeIII SVI_S-2  HFO_mol  FeS_mol Kin_Sid_mol Kin_ZnS_mol Kin_PbS_mol Kin_CuS_mol Cup Pb Zn Tracer DIC  Fe+2  Fe(Acetate)+  FeS(aq) FeHCO3+  Cu(HS)  Cu(HS)2- Cu2S(HS)2-2  Cu+ Pb+2 Pb(HS)2  Pb(Acetate)+ PbCO3 Zn+2  ZnS(HS)- Zn(Acetate)+ ZnCO3 HS- H2S Alkalinity lqkO2 lqkNO3 lqkFe lqkSO4 Sid_rate Sid_k Sid_q HCO3
+        -start
+10           pe_O2=-(-85.9951-4.*LA("H+")-LA("Oxy"))/4.
+20           pe_N5= 21.449-0.1*LA("Naq")+0.2*LA("NO3-")+1.2*LA("H+")
+30           pe_Fe3=-(-13.032-LA("Fe+3")+LA("Feii+2"))
+40           pe_S6=-(-33.66+LA("HS-")-9.*LA("H+")-LA("Sulfate-2"))/8.
+50           pe = -LA("e-")
+55           lqkO2=get(1)
+60           lqkNO3=get(3)
+65           lqkFe=get(2)
+70           lqkSO4=get(4)
+71           Sid_rate=get(5)
+72           Sid_k=get(6)
+73           Sid_q=get(7)
+80           PUNCH pe_O2, pe_N5, pe_Fe3, pe_S6, EQUI("Ferrihydrite")-0.4595, EQUI("FeS(ppt)"), KIN("Siderite_kin")-m0, KIN("ZnS_kin"), KIN("PbS_kin"),KIN("CuS_kin"), TOT("Cup"), TOT("Pb"), TOT("Zn"), TOT("Br"), TOT("C(4)"),MOL("Feii+2"),MOL("Feii(Acetate)+"),MOL("FeiiS"),MOL("FeiiHCO3+"),MOL("Cup(HS)"),MOL("Cup(HS)2-"),MOL("Cup2S(HS)2-2"),MOL("Cup+"),MOL("Pb+2"),MOL("Pb(HS)2"),MOL("Pb(Acetate)+"),MOL("PbCO3"),MOL("Zn+2"),MOL("ZnS(HS)-"),MOL("Zn(Acetate)+"), MOL("ZnCO3"), MOL("HS-"), MOL("H2S"), ALK, lqkO2,lqkNO3,lqkFe,lqkSO4, Sid_rate, Sid_k, Sid_q, MOL("HCO3-")
+        -end
+
+# TRANSPORT First 365 * 5 = 1825 days (now 5 years) have metals in infilling solution
+
+#         -cells           45
+#         -length            0.005	0.005	0.005	0.005	0.005	0.005	0.005	0.005	0.006	0.006	0.008	0.01
+#         -shifts          144000
+#         -time_step       1080
+#         -flow_direction  diffusion_only
+#         -boundary_conditions   constant    closed
+#         -diffc           4.2662e-10
+#         -dispersivity    0.01
+#         -correct_disp    true
+#         -print_cells     1-45
+#         -punch_cells     1-45
+#         -print_frequency 480 #60
+#         -punch_frequency 120
+
+# KNOBS
+#         -iterations  650
+#         -convergence_tolerance 1.e-12
+#         -tolerance   1.e-150
+
+
+END
